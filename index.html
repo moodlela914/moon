@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D 馬卡龍中秋文化探險終端 - 教學旗艦升級版</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --clay-bg: #fdf6ec; }
+    body {
+      background: radial-gradient(circle at 50% 10%, #fff7ed 0%, #fef3c7 40%, #f3e8ff 100%);
+      touch-action: manipulation;
+    }
+    .clay-card {
+      background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); border-radius: 28px; border: 4px solid #ffffff;
+      box-shadow: 12px 16px 28px rgba(186, 230, 253, 0.45), -8px -8px 20px rgba(255, 255, 255, 0.9), inset 2px 2px 4px rgba(255, 255, 255, 0.8), inset -4px -4px 8px rgba(0, 0, 0, 0.04);
+      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .clay-card:hover { transform: translateY(-4px); box-shadow: 16px 22px 32px rgba(244, 114, 182, 0.35), -10px -10px 24px rgba(255, 255, 255, 0.95); }
+    .clay-btn {
+      border-radius: 20px; border: 3px solid rgba(255, 255, 255, 0.8);
+      box-shadow: 6px 8px 16px rgba(0, 0, 0, 0.08), inset 2px 2px 3px rgba(255, 255, 255, 0.9); transition: all 0.15s ease;
+      cursor: pointer;
+    }
+    .clay-btn:active:not(:disabled) { transform: translateY(3px) scale(0.97); }
+    .clay-input {
+      border-radius: 16px; border: 3px solid #f8fafc; background: #f1f5f9; padding: 12px 16px;
+      box-shadow: inset 4px 4px 8px rgba(0,0,0,0.05), inset -4px -4px 8px rgba(255,255,255,0.8); outline: none; transition: 0.3s;
+    }
+    .clay-input:focus { border-color: #bae6fd; background: #ffffff; }
+    canvas { touch-action: none; user-select: none; -webkit-user-select: none; }
+    
+    .confetti { position: fixed; width: 10px; height: 10px; background-color: #fca5a5; z-index: 9999; pointer-events: none; animation: fall 3s ease-in forwards; }
+    @keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg) scale(1); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg) scale(0.5); opacity: 0; } }
+    
+    .timer-warn { animation: pulseWarn 1s infinite; color: #e11d48 !important; background-color: #ffe4e6 !important; }
+    @keyframes pulseWarn { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+    /* 射中燈謎時的震動效果 */
+    .shake { animation: shake-animation 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+    @keyframes shake-animation {
+      10%, 90% { transform: translate3d(-2px, 1px, 0); }
+      20%, 80% { transform: translate3d(3px, -2px, 0); }
+      30%, 50%, 70% { transform: translate3d(-4px, 3px, 0); }
+      40%, 60% { transform: translate3d(4px, -3px, 0); }
+    }
+  </style>
+</head>
+<body class="text-slate-800 min-h-screen flex flex-col font-sans select-none overflow-x-hidden text-base">
+
+  <!-- 登入面板 -->
+  <div id="login-modal" class="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4" style="display: flex;">
+    <div class="clay-card p-8 w-full max-w-md text-center">
+      <div class="text-6xl mb-4 animate-bounce">🌕</div>
+      <h2 class="text-4xl font-black text-slate-800 mb-3">中秋探險報到處</h2>
+      <p class="text-base text-slate-500 mb-6 font-bold">請輸入班級與姓名，完成五關獲得證書！</p>
+      <div class="flex flex-col gap-4 mb-6">
+        <input type="text" id="input-class" class="clay-input text-xl font-bold text-slate-700 text-center" placeholder="例如：六年一班" autocomplete="off">
+        <input type="text" id="input-name" class="clay-input text-xl font-bold text-slate-700 text-center" placeholder="請輸入真實姓名" autocomplete="off">
+      </div>
+      <button onclick="systemLogin()" class="clay-btn w-full py-4 bg-gradient-to-r from-pink-400 to-purple-400 text-white font-black text-xl tracking-wider">
+        確認報到 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- 教師面板 -->
+  <div id="teacher-modal" class="fixed inset-0 z-[90] bg-slate-900/80 backdrop-blur-md items-center justify-center p-4" style="display: none;">
+    <div class="clay-card w-full max-w-3xl h-[80vh] flex flex-col overflow-hidden relative">
+      <div class="bg-indigo-100 px-6 py-4 flex justify-between items-center border-b border-white">
+        <h3 class="text-2xl font-black text-indigo-900 flex items-center gap-2">👨‍🏫 教師管理控制台</h3>
+        <button onclick="closeTeacherPanel()" class="w-10 h-10 rounded-full bg-indigo-300 hover:bg-indigo-400 text-white font-bold text-xl">✕</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div class="flex justify-between items-center mb-4">
+          <h4 class="font-bold text-slate-700 text-lg">🏆 班級學習積分排行榜</h4>
+          <div class="flex gap-2">
+            <button onclick="clearAllData()" class="clay-btn px-4 py-2 bg-rose-400 text-white text-sm font-bold">⚠️ 清除資料</button>
+            <button onclick="exportCSV()" class="clay-btn px-4 py-2 bg-emerald-400 text-white text-sm font-bold">📊 匯出 CSV</button>
+          </div>
+        </div>
+        <table class="w-full text-base text-left text-slate-600">
+          <thead class="text-sm text-slate-500 uppercase bg-slate-200 rounded-t-lg">
+            <tr><th class="px-4 py-3">排名</th><th class="px-4 py-3">班級</th><th class="px-4 py-3">姓名</th><th class="px-4 py-3">通關數</th><th class="px-4 py-3 text-right">總積分</th></tr>
+          </thead>
+          <tbody id="leaderboard-body" class="bg-white divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- 系統頂部 -->
+  <header class="relative z-10 px-6 py-4 flex flex-wrap justify-between items-center max-w-7xl mx-auto w-full">
+    <div class="flex items-center space-x-3 cursor-pointer" onclick="checkTeacherAccess()">
+      <div class="w-16 h-16 bg-gradient-to-tr from-amber-200 to-pink-200 rounded-2xl flex items-center justify-center text-4xl shadow-lg border-2 border-white">🌕</div>
+      <div>
+        <h1 class="text-3xl md:text-4xl font-black bg-gradient-to-r from-pink-500 via-purple-500 to-sky-500 bg-clip-text text-transparent">中秋文化探險樂園</h1>
+        <p class="text-sm font-bold text-slate-500">紅焰教學團隊設計・完全通關版</p>
+      </div>
+    </div>
+    <div class="flex flex-col sm:flex-row items-end sm:items-center gap-3 mt-3 sm:mt-0">
+      <div class="flex items-center gap-2">
+        <button id="btn-bgm" onclick="toggleBGM()" class="clay-btn bg-white px-3 py-2 text-xl shadow-sm" title="背景音樂開關">🎵</button>
+        <div class="text-right ml-2">
+          <div id="display-player" class="text-base font-bold text-indigo-600">尚未登入</div>
+          <div class="text-xs font-bold text-slate-400">通關進度: <span id="display-progress" class="text-pink-500">0/5</span></div>
+        </div>
+      </div>
+      <div class="clay-btn bg-gradient-to-r from-amber-100 to-pink-100 px-6 py-2 flex items-center gap-2">
+        <span class="text-2xl">⭐</span><span id="total-score" class="text-3xl font-black text-amber-500">0</span>
+      </div>
+      <button id="btn-cert" onclick="downloadCertificate()" class="clay-btn bg-sky-400 text-white px-5 py-2 text-base font-bold opacity-50 cursor-not-allowed" disabled>🎓 領取證書</button>
+    </div>
+  </header>
+
+  <!-- 關卡選擇區 -->
+  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto px-4 py-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+      <!-- 關卡 1 -->
+      <div class="clay-card p-6 flex flex-col justify-between border-t-8 border-pink-300 relative">
+        <div id="badge-1" class="hidden absolute top-4 right-4 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">✓ 已通關</div>
+        <div><div class="flex items-center gap-3 mb-3"><div class="text-4xl">🐇</div><h3 class="text-2xl font-black text-slate-800">01. 玉兔搗仙藥</h3></div><p class="text-slate-600 text-sm font-bold leading-relaxed mb-4">體驗神話中為神仙搗製「仙丹」，限時 30 秒挑戰最高搗藥次數！</p></div>
+        <button onclick="openGameModal(1)" class="clay-btn w-full py-3 bg-pink-400 text-white font-black text-base">開始挑戰 🚀</button>
+      </div>
+      
+      <!-- 關卡 2 -->
+      <div class="clay-card p-6 flex flex-col justify-between border-t-8 border-sky-300 relative">
+        <div id="badge-2" class="hidden absolute top-4 right-4 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">✓ 已通關</div>
+        <div><div class="flex items-center gap-3 mb-3"><div class="text-4xl">✨</div><h3 class="text-2xl font-black text-slate-800">02. 嫦娥仙宮漫步</h3></div><p class="text-slate-600 text-sm font-bold leading-relaxed mb-4">限時 30 秒內躲避雷雲收集精緻月餅，展現嫦娥奔月的靈巧走位。</p></div>
+        <button onclick="openGameModal(2)" class="clay-btn w-full py-3 bg-sky-400 text-white font-black text-base">開始挑戰 🚀</button>
+      </div>
+
+      <!-- 關卡 3 -->
+      <div class="clay-card p-6 flex flex-col justify-between border-t-8 border-amber-300 relative">
+        <div id="badge-3" class="hidden absolute top-4 right-4 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">✓ 已通關</div>
+        <div><div class="flex items-center gap-3 mb-3"><div class="text-4xl">🍢</div><h3 class="text-2xl font-black text-slate-800">03. 臺灣特有烤肉趴</h3></div><p class="text-slate-600 text-sm font-bold leading-relaxed mb-4">看準黃金熟度，30 秒內瘋狂翻烤食材，考驗你的動態視力！</p></div>
+        <button onclick="openGameModal(3)" class="clay-btn w-full py-3 bg-amber-400 text-white font-black text-base">開始挑戰 🚀</button>
+      </div>
+
+      <!-- 關卡 4 -->
+      <div class="clay-card p-6 flex flex-col justify-between border-t-8 border-emerald-300 relative">
+        <div id="badge-4" class="hidden absolute top-4 right-4 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">✓ 已通關</div>
+        <div><div class="flex items-center gap-3 mb-3"><div class="text-4xl">🍈</div><h3 class="text-2xl font-black text-slate-800">04. 柚子祈福工坊</h3></div><p class="text-slate-600 text-sm font-bold leading-relaxed mb-4">黃金 30 秒創意彩繪！在逼真的立體柚子上畫出專屬祈福圖案。</p></div>
+        <button onclick="openGameModal(4)" class="clay-btn w-full py-3 bg-emerald-400 text-white font-black text-base">開始挑戰 🚀</button>
+      </div>
+
+      <!-- 關卡 5 -->
+      <div class="clay-card p-6 flex flex-col justify-between border-t-8 border-purple-300 relative">
+        <div id="badge-5" class="hidden absolute top-4 right-4 bg-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-md">✓ 已通關</div>
+        <div><div class="flex items-center gap-3 mb-3"><div class="text-4xl">🏮</div><h3 class="text-2xl font-black text-slate-800">05. 中秋成語射燈謎</h3></div><p class="text-slate-600 text-sm font-bold leading-relaxed mb-4">頂住時間壓力，30 秒內拉動神弓射中隨機變換的成語燈謎。</p></div>
+        <button onclick="openGameModal(5)" class="clay-btn w-full py-3 bg-purple-400 text-white font-black text-base">開始挑戰 🚀</button>
+      </div>
+
+      <!-- 關卡 6 (通關戰士榜) -->
+      <div class="clay-card p-6 flex flex-col justify-between bg-gradient-to-br from-indigo-50 to-blue-50 border-t-8 border-indigo-400">
+        <div><div class="flex items-center gap-3 mb-3"><div class="text-4xl">🏆</div><h3 class="text-2xl font-black text-indigo-900">06. 通關戰士榜</h3></div><p class="text-slate-600 text-sm font-bold leading-relaxed mb-4">領取完證書後，點擊這裡前往英雄榜，將你的榮耀上傳分享！</p></div>
+        <a href="https://padlet.com/qianyikeji1/padlet-s023t5lwt7vagtm5eibx" target="_blank" class="clay-btn w-full py-3 bg-indigo-500 hover:bg-indigo-400 text-white font-black text-base text-center block">
+          前往戰士榜 🚀
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- 3D 遊戲滿版燈箱 -->
+  <div id="game-modal" class="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-md items-center justify-center p-3 sm:p-5" style="display: none;">
+    <div class="clay-card bg-white w-full max-w-4xl h-[94vh] flex flex-col overflow-hidden relative shadow-2xl">
+      <div class="bg-gradient-to-r from-pink-50 via-purple-50 to-sky-50 px-5 py-4 border-b-2 border-white flex flex-wrap gap-2 justify-between items-center">
+        <h3 id="modal-title" class="text-2xl font-black text-slate-800 flex items-center gap-2"><span id="modal-icon">🎮</span> 遊戲</h3>
+        <div class="flex items-center gap-3">
+          <div id="timer-display" class="clay-btn bg-white px-5 py-2 flex items-center gap-2 font-black text-slate-500 text-base transition-colors">
+            ⏳ 30s
+          </div>
+          <div class="clay-btn bg-white px-5 py-2 flex items-center gap-2">
+            <span class="text-sm font-bold text-slate-400">得分</span><span id="current-game-score" class="text-xl font-black text-pink-500">0</span>
+          </div>
+          <button onclick="abortGame()" class="w-10 h-10 rounded-full bg-rose-400 hover:bg-rose-500 text-white font-bold flex items-center justify-center text-xl">✕</button>
+        </div>
+      </div>
+      <!-- 畫布核心 -->
+      <div id="canvas-container" class="flex-1 bg-slate-50 relative flex items-center justify-center p-2 overflow-hidden">
+        <canvas id="mainCanvas" width="800" height="460" class="max-w-full max-h-full rounded-2xl shadow-inner border-2 border-slate-200"></canvas>
+      </div>
+      <div class="bg-white px-5 py-4 border-t-2 border-slate-100 flex flex-wrap justify-between items-center gap-2">
+        <div id="game-instruction" class="text-sm md:text-base font-bold text-slate-600"></div>
+        <div id="custom-controls" class="flex gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結算知識燈箱 -->
+  <div id="result-modal" class="fixed inset-0 z-[110] bg-slate-900/80 backdrop-blur-md items-center justify-center p-4" style="display: none;">
+    <div class="clay-card max-w-lg w-full p-8 text-center flex flex-col items-center">
+      <div class="text-6xl mb-4 animate-bounce">🎉</div>
+      <h2 class="text-3xl font-black text-slate-800 mb-2">時間到！挑戰完成</h2>
+      <p class="text-xl text-slate-600 font-bold mb-1">本次關卡獲得積分：</p>
+      <p id="result-score" class="text-5xl text-pink-500 font-black mb-6">100</p>
+      <div class="bg-indigo-50 p-5 rounded-2xl border border-indigo-100 text-left mb-8 w-full shadow-inner">
+        <span class="text-sm bg-indigo-200 text-indigo-800 px-3 py-1 rounded-full font-black mb-3 inline-block">📖 中秋文化小學堂</span>
+        <p id="result-knowledge" class="text-base text-slate-700 leading-relaxed font-bold"></p>
+      </div>
+      <button onclick="closeResultModal()" class="clay-btn w-full py-4 bg-sky-400 text-white font-black text-xl tracking-wider">
+        領取積分並返回大廳 ⭐
+      </button>
+    </div>
+  </div>
+
+  <canvas id="certCanvas" width="1200" height="800" style="display: none;"></canvas>
+
+  <script>
+    /* ========================================================
+       全域管理、Web Audio 國樂 BGM (120bpm)
+       ======================================================== */
+    let currentUser = { classId: '', name: '', score: 0, completed: [] };
+    let allRecords = JSON.parse(localStorage.getItem('midAutumnRecordsV2')) || [];
+    let teacherClicks = 0;
+    let activeGameId = 0;
+    
+    let timeLeft = 30;
+    let timerInterval = null;
+    let activeCulturalText = "";
+
+    // BGM 控制
+    let audioCtx = null;
+    let bgmInterval = null;
+    let bgmMuted = true; // 預設關閉，由使用者主動點擊開啟
+    // 五聲音階 (宮商角徵羽)
+    const pentatonicScale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 587.33]; 
+    const melodyPattern = [0, 2, 4, -1, 3, 5, 4, -1, 2, 0, 1, 2, -1, 4, 2, 0]; 
+    let noteIdx = 0;
+
+    function initAudio() { 
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); 
+      if (audioCtx.state === 'suspended') audioCtx.resume(); 
+    }
+
+    function playTone(f, type='sine', d=0.15, vol=0.1) { 
+      try { 
+        if(!audioCtx) return;
+        const osc = audioCtx.createOscillator(), g = audioCtx.createGain(); 
+        osc.type = type; osc.frequency.value = f; 
+        g.gain.setValueAtTime(vol, audioCtx.currentTime); 
+        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d); 
+        osc.connect(g); g.connect(audioCtx.destination); 
+        osc.start(); osc.stop(audioCtx.currentTime + d); 
+      } catch(e){} 
+    }
+
+    // 120bpm = 每分鐘 120 拍 = 每秒 2 拍 = 每拍 500ms
+    function toggleBGM() {
+      initAudio();
+      bgmMuted = !bgmMuted;
+      document.getElementById('btn-bgm').innerText = bgmMuted ? '🔇' : '🔊';
+      if (!bgmMuted) {
+        if(bgmInterval) clearInterval(bgmInterval);
+        bgmInterval = setInterval(() => {
+          const note = melodyPattern[noteIdx % melodyPattern.length];
+          if (note !== -1) playTone(pentatonicScale[note], 'sine', 0.8, 0.04); 
+          noteIdx++;
+        }, 500); // 120bpm
+      } else {
+        clearInterval(bgmInterval);
+      }
+    }
+
+    function systemLogin() {
+      const cid = document.getElementById('input-class').value.trim();
+      const cname = document.getElementById('input-name').value.trim();
+      if (!cid || !cname) return alert("請輸入完整的班級與姓名喔！");
+      
+      const exist = allRecords.find(r => r.classId === cid && r.name === cname);
+      if (exist) { 
+        currentUser = exist; 
+        if(!currentUser.completed) currentUser.completed = [];
+        alert(`歡迎回來，${cname}！`); 
+      } else { 
+        currentUser = { classId: cid, name: cname, score: 0, completed: [] };
+        allRecords.push(currentUser); 
+      }
+      
+      document.getElementById('login-modal').style.display = 'none';
+      document.getElementById('display-player').innerText = `${cid} - ${cname}`;
+      updateUIState(); saveData();
+    }
+
+    function saveData() {
+      const idx = allRecords.findIndex(r => r.classId === currentUser.classId && r.name === currentUser.name);
+      if(idx > -1) allRecords[idx] = currentUser;
+      localStorage.setItem('midAutumnRecordsV2', JSON.stringify(allRecords));
+      checkCertificateUnlock();
+    }
+
+    function updateUIState() { 
+      document.getElementById('total-score').innerText = currentUser.score; 
+      document.getElementById('display-progress').innerText = `${currentUser.completed.length}/5`;
+      // 更新過關徽章
+      for(let i=1; i<=5; i++){
+        if(currentUser.completed.includes(i)) document.getElementById(`badge-${i}`).style.display = 'block';
+      }
+    }
+
+    /* 隱藏教師面板邏輯 */
+    function checkTeacherAccess() {
+      teacherClicks++;
+      if (teacherClicks >= 3) {
+        teacherClicks = 0;
+        if (prompt("請輸入密碼:") === "1234") { buildLeaderboard(); document.getElementById('teacher-modal').style.display = 'flex'; }
+      }
+      setTimeout(() => teacherClicks = 0, 2000);
+    }
+    function closeTeacherPanel() { document.getElementById('teacher-modal').style.display = 'none'; }
+    function buildLeaderboard() {
+      const tbody = document.getElementById('leaderboard-body'); tbody.innerHTML = '';
+      const sorted = [...allRecords].sort((a, b) => b.score - a.score);
+      sorted.forEach((r, i) => {
+        const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i+1);
+        tbody.innerHTML += `<tr class="border-b border-slate-100"><td class="px-4 py-3">${medal}</td><td class="px-4 py-3">${r.classId}</td><td class="px-4 py-3 font-bold">${r.name}</td><td class="px-4 py-3">${r.completed.length}/5</td><td class="px-4 py-3 text-right font-black text-amber-500">${r.score}</td></tr>`;
+      });
+    }
+    function exportCSV() {
+      let csv = "\uFEFF班級,姓名,通關數,總積分\n"; allRecords.forEach(r => csv += `${r.classId},${r.name},${r.completed.length},${r.score}\n`);
+      const link = document.createElement("a"); link.href = encodeURI("data:text/csv;charset=utf-8," + csv); link.download = "成績報表.csv"; link.click();
+    }
+    function clearAllData() { if(confirm("確定清除？")) { localStorage.removeItem('midAutumnRecordsV2'); allRecords=[]; currentUser.score=0; currentUser.completed=[]; updateUIState(); buildLeaderboard(); } }
+
+    /* 音效與特效 */
+    function playHitSound() { initAudio(); playTone(196, 'sawtooth', 0.15, 0.1); }
+    function playSuccessSound() { initAudio(); playTone(600, 'triangle', 0.1, 0.1); }
+    function triggerConfetti() {
+      initAudio();
+      playTone(523, 'triangle', 0.1, 0.1); setTimeout(() => playTone(659, 'triangle', 0.1, 0.1), 100); setTimeout(() => playTone(1046, 'triangle', 0.3, 0.1), 200);
+      const colors = ['#fca5a5', '#fef08a', '#bae6fd', '#bbf7d0', '#e9d5ff'];
+      for (let i = 0; i < 50; i++) {
+        const c = document.createElement('div'); c.className = 'confetti'; c.style.left = Math.random()*100+'vw'; c.style.backgroundColor = colors[Math.floor(Math.random()*colors.length)]; c.style.animationDelay = Math.random()*0.5+'s';
+        document.body.appendChild(c); setTimeout(() => c.remove(), 3000);
+      }
+    }
+
+    /* ========================================================
+       倒數計時與畫布管理
+       ======================================================== */
+    let currentGameScore = 0, activeGame = null, animationFrameId = null;
+    const canvas = document.getElementById('mainCanvas'), ctx = canvas.getContext('2d'), modal = document.getElementById('game-modal');
+    
+    function addScore(pts) {
+      currentGameScore += pts; document.getElementById('current-game-score').innerText = currentGameScore; 
+    }
+
+    function startGameTimer() {
+      timeLeft = 30;
+      const timerUI = document.getElementById('timer-display');
+      timerUI.innerText = `⏳ ${timeLeft}s`; timerUI.classList.remove('timer-warn');
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft--; timerUI.innerText = `⏳ ${timeLeft}s`;
+        if (timeLeft <= 10) timerUI.classList.add('timer-warn'); 
+        if (timeLeft <= 0) { clearInterval(timerInterval); timeUp(); }
+      }, 1000);
+    }
+
+    function timeUp() {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (activeGame && activeGame.cleanup) activeGame.cleanup();
+      
+      // 更新全域分數與通關進度
+      currentUser.score += currentGameScore;
+      if (!currentUser.completed.includes(activeGameId)) currentUser.completed.push(activeGameId);
+      updateUIState(); saveData();
+      
+      document.getElementById('result-score').innerText = currentGameScore;
+      document.getElementById('result-knowledge').innerText = activeCulturalText;
+      modal.style.display = 'none';
+      document.getElementById('result-modal').style.display = 'flex';
+      triggerConfetti();
+    }
+
+    function closeResultModal() {
+      document.getElementById('result-modal').style.display = 'none';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function abortGame() {
+      if (timerInterval) clearInterval(timerInterval);
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (activeGame && activeGame.cleanup) activeGame.cleanup();
+      activeGame = null; modal.style.display = 'none'; ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function openGameModal(key) {
+      initAudio(); activeGameId = key;
+      currentGameScore = 0; document.getElementById('current-game-score').innerText = "0"; document.getElementById('custom-controls').innerHTML = "";
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (activeGame && activeGame.cleanup) activeGame.cleanup();
+      modal.style.display = 'flex';
+      startGameTimer();
+
+      if (key === 1) Game1_PoundHerb();
+      else if (key === 2) Game2_FlyToMoon();
+      else if (key === 3) Game3_BBQParty();
+      else if (key === 4) Game4_PomeloCarving();
+      else if (key === 5) Game5_ShootRiddle();
+    }
+
+    /* ========================================================
+       證書邏輯 (五關全破解鎖、正式質感設計)
+       ======================================================== */
+    function checkCertificateUnlock() { 
+      const b = document.getElementById('btn-cert'); 
+      if(currentUser.completed.length >= 5) { 
+        b.disabled = false; 
+        b.classList.remove('opacity-50','cursor-not-allowed', 'bg-sky-400'); 
+        b.classList.add('bg-gradient-to-r','from-pink-500','to-amber-500','animate-pulse', 'shadow-lg'); 
+      } 
+    }
+
+    function downloadCertificate() { 
+      const c = document.getElementById('certCanvas'), x = c.getContext('2d'); 
+      
+      // 紙質底色
+      x.fillStyle = '#faf8f2'; x.fillRect(0,0,1200,800);
+      
+      // 燙金外框與暗紅內線
+      x.strokeStyle = '#d4af37'; x.lineWidth = 15; x.strokeRect(40,40,1120,720);
+      x.strokeStyle = '#8b0000'; x.lineWidth = 4; x.strokeRect(65,65,1070,670);
+      
+      // 右上角明月圖騰
+      const moonGrad = x.createRadialGradient(1000, 200, 10, 1000, 200, 100);
+      moonGrad.addColorStop(0, '#fffbeb'); moonGrad.addColorStop(1, '#fef08a');
+      x.fillStyle = moonGrad; x.beginPath(); x.arc(1000, 200, 100, 0, Math.PI*2); x.fill();
+
+      // 標題與內文
+      x.fillStyle = '#8b0000'; x.textAlign = 'center';
+      x.font = 'bold 72px "Microsoft JhengHei", serif'; x.fillText('中秋文化探險 通關證書', 600, 200);
+      
+      x.fillStyle = '#333333'; x.font = '36px "Microsoft JhengHei", sans-serif'; 
+      x.fillText('茲證明', 600, 320);
+      
+      x.font = 'bold 70px "Microsoft JhengHei", sans-serif'; x.fillText(`${currentUser.classId}  ${currentUser.name}`, 600, 440);
+      
+      x.font = '32px "Microsoft JhengHei", sans-serif'; 
+      x.fillText(`已成功完成中秋五大關卡挑戰，總積分 ${currentUser.score} 分。`, 600, 540);
+      x.fillText(`展現卓越之文化素養與運算思維，特發此證以資鼓勵。`, 600, 590);
+      
+      // 頒發單位與假印章
+      x.font = 'bold 36px "Microsoft JhengHei", sans-serif'; x.fillText('頒發單位：臺中市教育局', 850, 720);
+      
+      x.strokeStyle = '#c8102e'; x.lineWidth = 6; x.strokeRect(770, 670, 70, 70);
+      x.fillStyle = '#c8102e'; x.font = 'bold 24px "Microsoft JhengHei"';
+      x.fillText('教育', 805, 700); x.fillText('之印', 805, 725);
+      
+      x.fillStyle = '#666'; x.font = '24px "Microsoft JhengHei"'; x.fillText(`日期：${new Date().toLocaleDateString()}`, 250, 720);
+
+      const l = document.createElement('a'); l.download = `${currentUser.name}_中秋通關證書.png`; l.href = c.toDataURL(); l.click(); 
+      triggerConfetti(); 
+    }
+
+    /* ========================================================
+       遊戲 1 ~ 5 邏輯
+       ======================================================== */
+    function Game1_PoundHerb() {
+      document.getElementById('modal-title').innerText = "01. 玉兔搗仙藥"; 
+      document.getElementById('game-instruction').innerHTML = "🎯 抓準時機點擊畫面下方按鈕！";
+      activeCulturalText = "相傳玉兔為了救人，不惜跳入火中犧牲自己。天神感動於牠的無私奉獻，讓牠升上月宮，為神仙搗製長生不老的仙丹。";
+      
+      let ring = 160, pestleY = 180;
+      function render() {
+        ctx.fillStyle='#fdf4ff'; ctx.fillRect(0,0,800,460);
+        ctx.fillStyle='#fde047'; ctx.beginPath(); ctx.arc(400,200,160,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#cbd5e1'; ctx.beginPath(); ctx.ellipse(400,280,85,30,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#f472b6'; ctx.beginPath(); ctx.roundRect(320,210,160,70,35); ctx.fill();
+        ctx.fillStyle='#be185d'; ctx.beginPath(); ctx.ellipse(400,210,65,28,0,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#bae6fd'; ctx.beginPath(); ctx.roundRect(388,pestleY-80,24,90,12); ctx.fill();
+        ctx.lineWidth=8; ctx.strokeStyle=Math.abs(ring-65)<=35?'#4ade80':'#fda4af'; 
+        ctx.beginPath(); ctx.arc(400,200,Math.max(ring,10),0,Math.PI*2); ctx.stroke();
+        
+        ctx.fillStyle = Math.abs(ring-65)<=35 ? '#22c55e' : '#4ade80';
+        ctx.beginPath(); ctx.roundRect(280, 360, 240, 60, 30); ctx.fill();
+        ctx.fillStyle = '#ffffff'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.fillText("👇 點擊搗藥", 400, 400);
+
+        ring -= 3; if(pestleY<190) pestleY+=5;
+        if(ring<10){ ring=160; playHitSound(); }
+        animationFrameId = requestAnimationFrame(render);
+      }
+      canvas.onpointerdown = (e) => { 
+        pestleY = 160; 
+        if(Math.abs(ring-65) <= 35) { addScore(50); ring = 160; playSuccessSound(); } 
+        else { playHitSound(); }
+      };
+      activeGame = { cleanup: () => canvas.onpointerdown=null }; render();
+    }
+    
+    function Game2_FlyToMoon() {
+      document.getElementById('modal-title').innerText = "02. 嫦娥仙宮漫步"; 
+      document.getElementById('game-instruction').innerHTML = "👆 拖曳畫面躲避黑雲，收集精緻月餅！";
+      activeCulturalText = "嫦娥為了保護仙藥不落入壞人逢蒙手中，情急之下吞下仙藥，身體輕飄飄地飛向月宮。後人感念她，便在滿月時擺設月餅祭拜。";
+      
+      let y=230, items=[], frame=0;
+      function render() {
+        ctx.fillStyle='#bae6fd'; ctx.fillRect(0,0,800,460);
+        ctx.fillStyle='#db2777'; ctx.beginPath(); ctx.arc(130,y,22,0,Math.PI*2); ctx.fill();
+        
+        if(frame%45===0) items.push({x:840,y:Math.random()*360+50,r:25,type:Math.random()>0.3?'cake':'cloud'});
+        
+        for(let i=items.length-1;i>=0;i--){
+          let it = items[i]; it.x -= 5;
+          if (it.type === 'cake') {
+            ctx.fillStyle = 'rgba(0,0,0,0.15)'; ctx.beginPath(); ctx.ellipse(it.x, it.y+it.r*0.9, it.r, it.r*0.3, 0, 0, Math.PI*2); ctx.fill(); 
+            const grad = ctx.createRadialGradient(it.x-5, it.y-5, 3, it.x, it.y, it.r);
+            grad.addColorStop(0, '#fef08a'); grad.addColorStop(0.5, '#f59e0b'); grad.addColorStop(1, '#b45309');
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = '#d97706'; ctx.lineWidth = 2; 
+            for(let a=0; a<Math.PI*2; a+=Math.PI/3) { ctx.beginPath(); ctx.moveTo(it.x, it.y); ctx.lineTo(it.x + Math.cos(a)*it.r*0.7, it.y + Math.sin(a)*it.r*0.7); ctx.stroke(); }
+            ctx.fillStyle = '#1e1b4b'; 
+            ctx.beginPath(); ctx.arc(it.x-3, it.y-4, 1.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(it.x+4, it.y-2, 1.5, 0, Math.PI*2); ctx.fill();
+            ctx.beginPath(); ctx.arc(it.x-1, it.y+3, 1.5, 0, Math.PI*2); ctx.fill();
+          } else {
+            ctx.fillStyle='#475569'; ctx.beginPath(); ctx.arc(it.x,it.y,it.r,0,Math.PI*2); ctx.fill();
+          }
+          if(Math.hypot(130-it.x, y-it.y) < 45){ 
+            if(it.type==='cake'){ addScore(30); playSuccessSound(); } else { addScore(-20); playHitSound(); } 
+            items.splice(i,1); 
+          } else if(it.x < -40) items.splice(i,1);
+        }
+        frame++; animationFrameId = requestAnimationFrame(render);
+      }
+      canvas.onpointermove = (e) => { const r=canvas.getBoundingClientRect(); y = ((e.clientY-r.top)/r.height)*canvas.height; };
+      activeGame = { cleanup: () => canvas.onpointermove=null }; render();
+    }
+
+    function Game3_BBQParty() {
+      document.getElementById('modal-title').innerText = "03. 臺灣特有烤肉趴"; 
+      document.getElementById('game-instruction').innerHTML = "👆 變金黃色時點擊翻面，不要烤焦喔！";
+      activeCulturalText = "中秋烤肉是臺灣獨有文化，源自 1980 年代廣告詞「一家烤肉萬家香」，演變為凝聚家人感情的團圓活動。";
+      const skewers = [{x:200,p:Math.random()*50},{x:400,p:Math.random()*50},{x:600,p:Math.random()*50}];
+      function render() {
+        ctx.fillStyle = '#fef3c7'; ctx.fillRect(0, 0, 800, 460);
+        ctx.fillStyle = '#e2e8f0'; ctx.beginPath(); ctx.roundRect(100, 80, 600, 300, 24); ctx.fill();
+        skewers.forEach(item => {
+          item.p += 0.35; let c1 = '#fed7aa', c2 = '#f87171';
+          if(item.p>80 && item.p<140) { c1='#fef08a'; c2='#d97706'; } else if(item.p>=140) { c1='#64748b'; c2='#1e293b'; }
+          ctx.fillStyle = '#b45309'; ctx.beginPath(); ctx.roundRect(item.x-3, 50, 6, 360, 3); ctx.fill();
+          const grad = ctx.createLinearGradient(item.x-32, 140, item.x+32, 320); grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, c1); grad.addColorStop(1, c2);
+          ctx.fillStyle = grad; ctx.beginPath(); ctx.roundRect(item.x-32, 140, 64, 180, 22); ctx.fill();
+        });
+        animationFrameId = requestAnimationFrame(render);
+      }
+      canvas.onpointerdown = (e) => {
+        const r=canvas.getBoundingClientRect(); const cx=((e.clientX-r.left)/r.width)*canvas.width;
+        skewers.forEach(item => { if(Math.abs(cx-item.x)<45) { if(item.p>80 && item.p<140){addScore(40); playSuccessSound();} else if(item.p>=140){playHitSound();} item.p=0; } });
+      };
+      activeGame = { cleanup: () => canvas.onpointerdown=null }; render();
+    }
+
+    // 【修正：擬真柚子繪製】
+    function Game4_PomeloCarving() {
+      document.getElementById('modal-title').innerText = "04. 柚子祈福工坊"; 
+      document.getElementById('game-instruction').innerHTML = "🎨 在逼真的柚子上塗鴉祈福！(畫滿50劃得分)";
+      activeCulturalText = "中秋吃柚子大有學問！「柚子」與保佑的「佑字」諧音，戴上柚子帽，象徵祈求神明護佑孩童平安長大。";
+      
+      let isDrawing = false, strokes = 0;
+      
+      function renderBase() {
+        ctx.fillStyle='#f8fafc'; ctx.fillRect(0,0,800,460);
+        // 柚子陰影
+        ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.ellipse(400, 370, 160, 40, 0, 0, Math.PI*2); ctx.fill();
+        // 擬真柚子漸層底 (梨形)
+        const pomeloGrad = ctx.createRadialGradient(350, 200, 20, 400, 250, 180);
+        pomeloGrad.addColorStop(0, '#d9f99d'); pomeloGrad.addColorStop(0.5, '#84cc16'); pomeloGrad.addColorStop(1, '#4d7c0f');
+        ctx.fillStyle = pomeloGrad;
+        ctx.beginPath();
+        ctx.moveTo(400, 100); ctx.bezierCurveTo(550, 100, 580, 380, 400, 380); ctx.bezierCurveTo(220, 380, 250, 100, 400, 100);
+        ctx.fill();
+        // 擬真表皮紋理 (點狀毛孔)
+        ctx.fillStyle = 'rgba(21, 128, 61, 0.15)';
+        for(let i=0; i<600; i++){
+          const angle = Math.random() * Math.PI * 2;
+          const radius = Math.random() * 140;
+          const px = 400 + Math.cos(angle) * radius * (Math.random()*0.5 + 0.8);
+          const py = 250 + Math.sin(angle) * radius;
+          ctx.beginPath(); ctx.arc(px, py, Math.random()*1.5, 0, Math.PI*2); ctx.fill();
+        }
+        // 蒂頭
+        ctx.fillStyle = '#3f6212'; ctx.beginPath(); ctx.roundRect(390, 85, 20, 25, 5); ctx.fill();
+      }
+      
+      renderBase();
+      
+      function draw(e) { 
+        if(!isDrawing) return; const r=canvas.getBoundingClientRect(); 
+        ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(((e.clientX-r.left)/r.width)*canvas.width, ((e.clientY-r.top)/r.height)*canvas.height, 8, 0, Math.PI*2); ctx.fill(); 
+        strokes++; if(strokes%50===0) { addScore(20); playSuccessSound(); } 
+      }
+      canvas.onpointerdown = (e) => { isDrawing = true; draw(e); }; canvas.onpointermove = draw; window.onpointerup = () => isDrawing = false;
+      activeGame = { cleanup: () => { canvas.onpointerdown=null; canvas.onpointermove=null; window.onpointerup=null; } };
+    }
+
+    // 【修正：射中隨機洗牌、震動、專屬音效】
+    function Game5_ShootRiddle() {
+      document.getElementById('modal-title').innerText = "05. 中秋成語射燈謎"; 
+      document.getElementById('game-instruction').innerHTML = "🏹 向下拉弓發射，射中正確的成語！";
+      activeCulturalText = "古人喜歡在燈籠上寫謎語考驗智慧。透過拋物線神箭，我們除了學運算，也體會了傳統成語祝福的美好意境。";
+      
+      let texts = [
+        {t:"花好月圓", c:true, col:'#f43f5e'}, 
+        {t:"海底撈月", c:false, col:'#38bdf8'}, 
+        {t:"明察秋毫", c:false, col:'#a855f7'}
+      ];
+      
+      let targetXPositions = [190, 400, 610];
+      let targets = buildTargets();
+      
+      function buildTargets() {
+        return texts.map((item, index) => ({
+          x: targetXPositions[index], y: 100, t: item.t, c: item.c, col: item.col
+        }));
+      }
+
+      // 洗牌陣列函數
+      function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [array[i], array[j]] = [array[j], array[i]];
+        }
+      }
+
+      const originY = 340; let arrow = {x:400,y:originY,vx:0,vy:0,f:false}, drag = null;
+      
+      function render() {
+        ctx.fillStyle='#fdf2f8'; ctx.fillRect(0,0,800,460);
+        
+        targets.forEach(t => { 
+          ctx.fillStyle=t.col; ctx.beginPath(); ctx.roundRect(t.x-48,t.y-48,96,96,28); ctx.fill(); 
+          ctx.fillStyle='#fff'; ctx.font='bold 18px sans-serif'; ctx.textAlign='center'; ctx.fillText(t.t,t.x,t.y+6); 
+        });
+        
+        ctx.fillStyle='#fbcfe8'; ctx.beginPath(); ctx.arc(400,originY+20,42,0,Math.PI*2); ctx.fill();
+        
+        if(arrow.f){
+          arrow.x+=arrow.vx; arrow.y+=arrow.vy; arrow.vy+=0.16;
+          ctx.fillStyle='#f59e0b'; ctx.beginPath(); ctx.arc(arrow.x,arrow.y,10,0,Math.PI*2); ctx.fill();
+          
+          targets.forEach(t=>{ 
+            if(Math.hypot(arrow.x-t.x,arrow.y-t.y)<55){ 
+              arrow.f=false; 
+              if(t.c){ 
+                addScore(100); 
+                playTone(800, 'triangle', 0.2, 0.2); // 射中專屬音效
+                // 觸發畫面震動
+                document.getElementById('canvas-container').classList.add('shake');
+                setTimeout(() => document.getElementById('canvas-container').classList.remove('shake'), 400);
+                
+                // 重新洗牌
+                shuffleArray(texts);
+                targets = buildTargets();
+              } else { 
+                playHitSound(); 
+              } 
+              arrow.x=400; arrow.y=originY; arrow.vx=0; arrow.vy=0; 
+            } 
+          });
+          if(arrow.y>480 || arrow.x<-20 || arrow.x>820){ arrow.f=false; arrow.x=400; arrow.y=originY; arrow.vx=0; arrow.vy=0; }
+        }
+        if(drag && !arrow.f){ ctx.strokeStyle='#ec4899'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(400,originY); ctx.lineTo(drag.x,drag.y); ctx.stroke(); }
+        animationFrameId = requestAnimationFrame(render);
+      }
+      
+      canvas.onpointerdown=(e)=>{ if(arrow.f)return; const r=canvas.getBoundingClientRect(); drag={x:((e.clientX-r.left)/r.width)*800,y:((e.clientY-r.top)/r.height)*460}; };
+      canvas.onpointermove=(e)=>{ if(!drag)return; const r=canvas.getBoundingClientRect(); drag.x=((e.clientX-r.left)/r.width)*800; drag.y=((e.clientY-r.top)/r.height)*460; };
+      canvas.onpointerup=()=>{ if(!drag)return; arrow.vx=(400-drag.x)*0.13; arrow.vy=(originY-drag.y)*0.13; arrow.f=true; drag=null; playTone(620,'triangle',0.12, 0.1); };
+      activeGame = { cleanup: () => { canvas.onpointerdown=null; canvas.onpointermove=null; canvas.onpointerup=null; } }; render();
+    }
+  </script>
+</body>
+</html>
